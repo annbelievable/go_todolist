@@ -1,6 +1,6 @@
 package main
 
-import "github.com/annbelievable/todolist/cmd"
+import "todolist/cmd"
 
 func main() {
 	cmd.Execute()
