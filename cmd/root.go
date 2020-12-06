@@ -1,27 +1,16 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var cfgFile string
@@ -29,16 +18,15 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "todolist",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "A todo list manager",
+	Long: `A todo list manager that has the following abilities:
+1) Add a task
+2) View a list of tasks
+3) Update the status of a task
+4) Remove a task`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) { fmt.Println("hello todolist user") },
+	// Run: func(cmd *cobra.Command, args []string) { fmt.Println("hello todolist user") },
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -50,6 +38,7 @@ func Execute() {
 	}
 }
 
+//i will have to init the db/json/csv here
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -57,11 +46,55 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
+	//this is an example that tells you anything that needs to be configured on initialization can be done here
+	//im curious how they use this configuration file though
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.todolist.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	//initialize the database
+	_, err := os.Stat("sqlite-todolist.db")
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			file, err := os.Create("sqlite-todolist.db")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			file.Close()
+		} else {
+			fmt.Println(err)
+		}
+	}
+
+	sqliteDatabase, _ := sql.Open("sqlite3", "sqlite-todolist.db")
+	statement := `SELECT name FROM sqlite_master WHERE type='table' AND name='todo_task';`
+	row := sqliteDatabase.QueryRow(statement)
+
+	var name string
+	row.Scan(&name)
+
+	if name != "todo_task" {
+		statement := `CREATE TABLE IF NOT EXISTS todo_task(
+			"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+			"task_name" TEXT NOT NULL,
+			"task_description" TEXT,
+			"status" TEXT NOT NULL,
+			"datecreated" TEXT,
+			"datemodified" TEXT
+		);`
+
+		query, err := sqliteDatabase.Prepare(statement)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		query.Exec()
+	}
+
+	sqliteDatabase.Close()
 }
 
 // initConfig reads in config file and ENV variables if set.
